@@ -1,0 +1,13 @@
+{
+  "name": "autoflow-ai",
+  "private": true,
+  "scripts": {
+    "dev:api": "cd apps/api && python -m uvicorn app.main:app --reload --port 8000",
+    "dev:web": "cd apps/web && npm run dev",
+    "test:api": "cd apps/api && python -m pytest -q",
+    "lint:api": "cd apps/api && ruff check app tests",
+    "build:web": "cd apps/web && npm run build",
+    "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d postgres redis",
+    "docker:all": "docker compose -f infra/docker/docker-compose.yml up -d --build"
+  }
+}

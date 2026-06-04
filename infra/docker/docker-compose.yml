@@ -1,0 +1,94 @@
+# Environnement de développement complet.
+# Prérequis : `cp .env.example .env` à la racine du dépôt.
+x-api-env: &api-env
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-autoflow}:${POSTGRES_PASSWORD:-autoflow}@postgres:5432/${POSTGRES_DB:-autoflow}
+  DATABASE_URL_SYNC: postgresql+psycopg://${POSTGRES_USER:-autoflow}:${POSTGRES_PASSWORD:-autoflow}@postgres:5432/${POSTGRES_DB:-autoflow}
+  AUTO_CREATE_TABLES: "false"
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/0
+  CELERY_RESULT_BACKEND: redis://redis:6379/1
+  WORKFLOW_EXECUTOR: celery
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-autoflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-autoflow}
+      POSTGRES_DB: ${POSTGRES_DB:-autoflow}
+    ports:
+      - "127.0.0.1:5432:5432"  # jamais exposé sur le réseau
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-autoflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: ../../apps/api
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: ../../.env
+        required: false
+    environment: *api-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../../apps/api:/app
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  worker:
+    build:
+      context: ../../apps/api
+    env_file:
+      - path: ../../.env
+        required: false
+    environment: *api-env
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../../apps/api:/app
+    command: celery -A app.tasks.celery_app worker --beat --loglevel=info
+    healthcheck:
+      disable: true
+
+  web:
+    build:
+      context: ../../apps/web
+      target: dev
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      - api
+    volumes:
+      - ../../apps/web:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  postgres_data:
+  redis_data:

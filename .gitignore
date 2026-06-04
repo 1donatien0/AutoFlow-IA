@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.pnp.*
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Build
+.next/
+out/
+dist/
+*.egg-info/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Data
+*.db
+postgres_data/
+redis_data/
+
+# Logs
+*.log
+.coverage
+htmlcov/
+
+# spaCy models cache
+.spacy/
+
+# Tests / outils
+.pytest_cache/
+.ruff_cache/
+*.tsbuildinfo
