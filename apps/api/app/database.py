@@ -35,6 +35,14 @@ class Base(DeclarativeBase):
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Session par requête, validée à la fin de la fonction de route.
+
+    Toujours l'injecter avec ``Depends(get_db, scope="function")`` : avec la portée
+    par défaut (« request »), FastAPI ≥ 0.118 exécute le code après ``yield`` — donc
+    le COMMIT — *après* l'envoi de la réponse. Le client pouvait alors recevoir un
+    200 pour une écriture qui échouait ensuite, et sa requête suivante (ex. recharger
+    la liste après « Approuver ») lire l'état d'avant le commit.
+    """
     async with async_session_maker() as session:
         try:
             yield session

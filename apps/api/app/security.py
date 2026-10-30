@@ -7,7 +7,7 @@ import hashlib
 import secrets
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
@@ -98,7 +98,7 @@ def verify_oauth_state(state: str, provider: str) -> tuple[UUID, UUID]:
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -141,31 +141,54 @@ def decrypt_secret(token: str) -> str:
 # --------------------------------------------------------------------------- anti brute-force
 class LoginRateLimiter:
     """Limiteur en mémoire (fenêtre glissante). Suffisant pour un process unique ;
-    en multi-instances, remplacer par Redis."""
+    en multi-instances, remplacer par Redis.
+
+    Les clés vides sont supprimées : sans cela, chaque email ou IP jamais vu
+    laissait une entrée en mémoire pour toujours (croissance illimitée, exploitable
+    en envoyant des tentatives avec des emails aléatoires)."""
+
+    MAX_KEYS = 100_000  # garde-fou mémoire absolu
 
     def __init__(self) -> None:
-        self._hits: dict[str, deque[float]] = defaultdict(deque)
+        self._hits: dict[str, deque[float]] = {}
         self._lock = threading.Lock()
 
-    def _prune(self, key: str, now: float, window: int) -> deque[float]:
-        q = self._hits[key]
+    @staticmethod
+    def _prune(q: deque[float], now: float, window: int) -> None:
         while q and now - q[0] > window:
             q.popleft()
-        return q
 
-    def check(self, key: str) -> None:
+    def _sweep(self, now: float, window: int) -> None:
+        for key in list(self._hits):
+            q = self._hits[key]
+            self._prune(q, now, window)
+            if not q:
+                del self._hits[key]
+
+    def check(self, key: str, max_attempts: int | None = None) -> None:
         s = get_settings()
+        limit = max_attempts or s.login_max_attempts
         with self._lock:
-            q = self._prune(key, time.monotonic(), s.login_window_seconds)
-            if len(q) >= s.login_max_attempts:
+            q = self._hits.get(key)
+            if q is None:
+                return
+            self._prune(q, time.monotonic(), s.login_window_seconds)
+            if not q:
+                del self._hits[key]
+                return
+            if len(q) >= limit:
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Too many login attempts, try again later",
+                    detail="Too many attempts, try again later",
                 )
 
     def record_failure(self, key: str) -> None:
+        s = get_settings()
+        now = time.monotonic()
         with self._lock:
-            self._hits[key].append(time.monotonic())
+            if key not in self._hits and len(self._hits) >= self.MAX_KEYS:
+                self._sweep(now, s.login_window_seconds)
+            self._hits.setdefault(key, deque()).append(now)
 
     def reset(self, key: str | None = None) -> None:
         with self._lock:
@@ -173,6 +196,9 @@ class LoginRateLimiter:
                 self._hits.clear()
             else:
                 self._hits.pop(key, None)
+
+    def __len__(self) -> int:
+        return len(self._hits)
 
 
 login_limiter = LoginRateLimiter()

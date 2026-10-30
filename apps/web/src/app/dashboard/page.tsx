@@ -21,6 +21,17 @@ interface EventRow {
   confidence: number;
 }
 
+const CATEGORY_LABEL: Record<string, string> = {
+  devis: "Devis",
+  support: "Questions clients",
+  facturation: "Facturation",
+  rendez_vous: "Rendez-vous",
+  relances: "Relances",
+  autre: "Autre",
+};
+
+const label = (cat: string) => CATEGORY_LABEL[cat] ?? cat;
+
 export default function DashboardPage() {
   const ready = useAuthGuard();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
@@ -80,11 +91,13 @@ export default function DashboardPage() {
 
       <Card title="Répartition par catégorie">
         <div className="flex flex-wrap gap-3">
-          {Object.entries(metrics.category_breakdown).map(([cat, n]) => (
-            <span key={cat} className="px-3 py-1 bg-slate-100 rounded-full text-sm">
-              {cat} : {n}
-            </span>
-          ))}
+          {Object.entries(metrics.category_breakdown)
+            .sort(([, a], [, b]) => b - a)
+            .map(([cat, n]) => (
+              <span key={cat} className="px-3 py-1 bg-slate-100 rounded-full text-sm">
+                {label(cat)} : {n}
+              </span>
+            ))}
           {Object.keys(metrics.category_breakdown).length === 0 && (
             <p className="text-slate-500 text-sm">Synchronisez des emails depuis Intégrations</p>
           )}
@@ -105,7 +118,7 @@ export default function DashboardPage() {
               {events.map((e) => (
                 <tr key={e.id} className="border-b border-slate-100">
                   <td className="py-2 pr-4">{e.subject || "(sans objet)"}</td>
-                  <td className="pr-4">{e.category}</td>
+                  <td className="pr-4">{label(e.category)}</td>
                   <td>{(e.confidence * 100).toFixed(0)} %</td>
                 </tr>
               ))}

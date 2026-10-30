@@ -19,10 +19,35 @@ STEP_LABELS = {
     "relances": "Relance",
     "autre": "Email_generique",
 }
+# Libellés lisibles pour nommer les processus (le nom doit être stable d'une
+# découverte à l'autre : il sert de titre aux suggestions associées).
+STEP_NAMES = {
+    "Email_demande": "Demande de devis",
+    "Email_question": "Question client",
+    "Facturation": "Facturation",
+    "Planification": "Rendez-vous",
+    "Relance": "Relance",
+    "Email_generique": "Échange",
+}
 SEP = " → "
 MAX_PROCESSES = 10
 MAX_INSTANCES_PER_PROCESS = 20
 MIN_DURATION_MINUTES = 5
+
+
+def process_name(steps: list[str]) -> str:
+    """Nom lisible et déterministe : étapes consécutives identiques regroupées (« Relance ×3 »)."""
+    parts: list[str] = []
+    prev, run = None, 0
+    for step in [*steps, None]:
+        if step == prev:
+            run += 1
+            continue
+        if prev is not None:
+            label = STEP_NAMES.get(prev, prev)
+            parts.append(f"{label} ×{run}" if run > 1 else label)
+        prev, run = step, 1
+    return SEP.join(parts)[:255]
 
 
 async def discover_processes(db: AsyncSession, org_id: UUID) -> list[DiscoveredProcess]:
@@ -66,7 +91,7 @@ async def discover_processes(db: AsyncSession, org_id: UUID) -> list[DiscoveredP
         durations = sequence_durations[seq]
         proc = DiscoveredProcess(
             organization_id=org_id,
-            name=f"Processus_{len(discovered) + 1}",
+            name=process_name(steps),
             trigger_label=steps[0],
             steps=steps,
             frequency=freq,

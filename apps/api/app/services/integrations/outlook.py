@@ -14,6 +14,7 @@ from app.config import get_settings
 from app.models.entities import Integration, IntegrationProvider, IntegrationStatus
 from app.services.ingestion import ingest_email_batch
 from app.services.integrations.common import (
+    SYNCABLE_STATUSES,
     IntegrationError,
     get_integration,
     mark_synced,
@@ -100,7 +101,7 @@ def _acquire_token(cache_blob: str) -> tuple[str, str]:
 
 async def sync_outlook_messages(db: AsyncSession, org_id: UUID, max_results: int = 50) -> int:
     integration = await get_integration(db, org_id, PROVIDER)
-    if not integration or integration.status != IntegrationStatus.CONNECTED.value:
+    if not integration or integration.status not in SYNCABLE_STATUSES:
         raise IntegrationError("Outlook is not connected")
     cache_blob = read_credentials(integration)
     if not cache_blob:

@@ -67,6 +67,7 @@ class IntegrationOut(BaseModel):
     status: str
     scopes: str
     last_sync_at: datetime | None
+    is_demo: bool = False
 
     model_config = {"from_attributes": True}
 

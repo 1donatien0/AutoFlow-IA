@@ -15,7 +15,7 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 async def run(
     body: AgentRunRequest,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await run_agent(db, user.organization_id, body.agent_type, body.task, actor=user.email)
 
@@ -24,7 +24,7 @@ async def run(
 async def list_runs(
     limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(AgentRun)

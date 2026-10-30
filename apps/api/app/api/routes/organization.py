@@ -18,7 +18,7 @@ router = APIRouter(prefix="/organization", tags=["organization"])
 async def audit_logs(
     limit: int = Query(100, ge=1, le=500),
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(AuditLog)
@@ -32,7 +32,7 @@ async def audit_logs(
 @router.get("/export")
 async def export_data(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await log_audit(db, user.organization_id, "organization_data_exported", None, actor=user.email)
     return await export_organization(db, user.organization_id)
@@ -42,7 +42,7 @@ async def export_data(
 async def delete_data(
     confirm: bool = Query(False, description="Doit valoir true pour confirmer l'effacement"),
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     if not confirm:
         raise HTTPException(status_code=400, detail="Pass confirm=true to delete all organization data")

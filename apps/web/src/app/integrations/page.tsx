@@ -14,7 +14,14 @@ interface Integration {
   provider: string;
   status: string;
   last_sync_at: string | null;
+  is_demo: boolean;
 }
+
+const STATUS_LABEL: Record<string, string> = {
+  connected: "connecté",
+  error: "erreur — réessayez ou reconnectez",
+  disconnected: "déconnecté",
+};
 
 const LABELS: Record<string, string> = { gmail: "Gmail", outlook: "Outlook" };
 
@@ -76,11 +83,23 @@ function IntegrationsContent() {
           {(["gmail", "outlook"] as Provider[]).map((p) => {
             const integ = byProvider[p];
             const connected = integ?.status === "connected";
+            // Une intégration en erreur peut être resynchronisée ; une connexion démo n'a
+            // pas de jeton réel : on y charge les données démo au lieu d'une synchro qui échouerait.
+            const canSync = integ && (connected || integ.status === "error");
             return (
               <div key={p} className="flex flex-wrap items-center gap-3 border rounded-lg p-3">
                 <span className="font-medium w-24">{LABELS[p]}</span>
-                <span className={`text-xs px-2 py-1 rounded ${connected ? "bg-green-100 text-green-800" : "bg-slate-100"}`}>
-                  {integ?.status ?? "non connecté"}
+                <span
+                  className={`text-xs px-2 py-1 rounded ${
+                    connected
+                      ? "bg-green-100 text-green-800"
+                      : integ?.status === "error"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-slate-100"
+                  }`}
+                >
+                  {integ ? (STATUS_LABEL[integ.status] ?? integ.status) : "non connecté"}
+                  {integ?.is_demo && " (démo)"}
                 </span>
                 {integ?.last_sync_at && (
                   <span className="text-xs text-slate-500">
@@ -96,11 +115,11 @@ function IntegrationsContent() {
                   >
                     {connected ? "Reconnecter" : "Connecter"}
                   </button>
-                  {connected && (
+                  {canSync && (
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => sync(p)}
+                      onClick={() => sync(integ.is_demo ? "demo" : p)}
                       className="px-3 py-1.5 bg-brand-600 text-white rounded text-sm disabled:opacity-60"
                     >
                       Synchroniser

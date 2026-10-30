@@ -14,7 +14,7 @@ router = APIRouter(prefix="/observation", tags=["observation"])
 @router.get("/dashboard", response_model=DashboardMetrics)
 async def dashboard(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await compute_dashboard(db, user.organization_id)
 
@@ -24,7 +24,7 @@ async def list_events(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     query = (
         select(RawEvent, ClassifiedEvent)

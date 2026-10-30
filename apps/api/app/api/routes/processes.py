@@ -16,7 +16,7 @@ router = APIRouter(prefix="/processes", tags=["processes"])
 @router.post("/discover", response_model=list[DiscoveredProcessOut])
 async def discover(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await discover_processes(db, user.organization_id)
 
@@ -24,7 +24,7 @@ async def discover(
 @router.get("", response_model=list[DiscoveredProcessOut])
 async def list_processes(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(DiscoveredProcess)
@@ -38,7 +38,7 @@ async def list_processes(
 async def list_instances(
     process_id: UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(ProcessInstance)
@@ -55,7 +55,7 @@ async def list_instances(
 async def instance_timeline(
     instance_id: UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(ProcessInstance).where(

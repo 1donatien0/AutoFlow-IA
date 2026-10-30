@@ -16,7 +16,7 @@ router = APIRouter(prefix="/suggestions", tags=["suggestions"])
 @router.post("/generate", response_model=list[SuggestionOut])
 async def generate(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await generate_suggestions(db, user.organization_id)
 
@@ -24,7 +24,7 @@ async def generate(
 @router.get("", response_model=list[SuggestionOut])
 async def list_suggestions(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(Suggestion)
@@ -39,7 +39,7 @@ async def update_suggestion(
     suggestion_id: UUID,
     body: SuggestionUpdate,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     sug = await update_suggestion_status(db, user.organization_id, suggestion_id, body.status, actor=user.email)
     if not sug:

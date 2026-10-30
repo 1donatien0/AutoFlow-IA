@@ -40,14 +40,15 @@ async def generate_suggestions(db: AsyncSession, org_id: UUID) -> list[Suggestio
         )
     ).scalars().all()
 
-    # On ne régénère que les brouillons/rejets non référencés : une suggestion
-    # approuvée (ou liée à un workflow) fait partie de l'historique de décision.
+    # On ne régénère que les brouillons non référencés. Une suggestion approuvée OU
+    # rejetée est une décision de l'utilisateur : la supprimer ferait réapparaître
+    # une suggestion rejetée sous forme de brouillon à chaque régénération.
     referenced = select(Workflow.suggestion_id).where(Workflow.suggestion_id.is_not(None))
     stale = (
         await db.execute(
             select(Suggestion).where(
                 Suggestion.organization_id == org_id,
-                Suggestion.status != SuggestionStatus.APPROVED.value,
+                Suggestion.status == SuggestionStatus.DRAFT.value,
                 Suggestion.id.not_in(referenced),
             )
         )

@@ -22,7 +22,7 @@ router = APIRouter(prefix="/workflows", tags=["workflows"])
 async def from_suggestion(
     suggestion_id: UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     wf = await create_workflow_from_suggestion(db, user.organization_id, suggestion_id, actor=user.email)
     if not wf:
@@ -33,7 +33,7 @@ async def from_suggestion(
 @router.get("", response_model=list[WorkflowOut])
 async def list_workflows(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(Workflow).where(Workflow.organization_id == user.organization_id).order_by(Workflow.created_at.desc())
@@ -45,7 +45,7 @@ async def list_workflows(
 async def execute(
     body: WorkflowExecuteRequest,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     try:
         return await execute_workflow(db, user.organization_id, body.workflow_id, actor=user.email)
@@ -58,7 +58,7 @@ async def execute(
 async def list_executions(
     limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(WorkflowExecution)
@@ -74,7 +74,7 @@ async def kill_switch(
     workflow_id: UUID,
     enabled: bool = True,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     wf = await toggle_kill_switch(db, user.organization_id, workflow_id, enabled, actor=user.email)
     if not wf:

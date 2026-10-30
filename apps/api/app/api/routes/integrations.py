@@ -35,7 +35,7 @@ def _front_redirect(**params: str) -> RedirectResponse:
 @router.get("", response_model=list[IntegrationOut])
 async def list_integrations(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(select(Integration).where(Integration.organization_id == user.organization_id))
     return result.scalars().all()
@@ -61,7 +61,7 @@ async def oauth_callback(
     state: str = Query(..., max_length=2048),
     code: str | None = Query(None, max_length=4096),
     error: str | None = Query(None, max_length=256),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     if provider not in ("gmail", "outlook"):
         raise HTTPException(status_code=404, detail="Unknown provider")
@@ -81,7 +81,7 @@ async def oauth_callback(
 async def demo_connect(
     provider: str,
     state: str = Query(..., max_length=2048),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Connexion simulée (sans OAuth réel) — uniquement si DEMO_MODE=true et état signé valide."""
     if not get_settings().demo_mode or provider not in ("gmail", "outlook"):
@@ -100,7 +100,7 @@ async def demo_connect(
 async def sync_data(
     body: SyncRequest,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     provider = "demo" if body.demo else body.provider
     try:
@@ -113,6 +113,11 @@ async def sync_data(
         else:
             count = await sync_outlook_messages(db, user.organization_id)
     except IntegrationError as exc:
+        # Conserve le statut « error » posé par le connecteur (sinon annulé par le rollback)
+        # et trace l'échec ; aucun email partiel n'a été ingéré à ce stade.
+        await log_audit(db, user.organization_id, "integration_sync_failed", {"provider": provider},
+                        actor=user.email)
+        await db.commit()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     await log_audit(db, user.organization_id, "integration_sync", {"provider": provider, "ingested": count},
                     actor=user.email)

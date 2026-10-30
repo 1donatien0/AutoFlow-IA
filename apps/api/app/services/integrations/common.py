@@ -11,6 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.entities import Integration, IntegrationStatus
 from app.security import decrypt_secret, encrypt_secret
 
+# Une intégration en erreur (jeton expiré, panne fournisseur…) peut être resynchronisée :
+# un succès la repasse en « connected ».
+SYNCABLE_STATUSES = frozenset({IntegrationStatus.CONNECTED.value, IntegrationStatus.ERROR.value})
+
 
 class IntegrationError(Exception):
     """Erreur côté fournisseur (OAuth / API) présentable à l'utilisateur."""

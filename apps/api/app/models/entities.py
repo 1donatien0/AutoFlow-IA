@@ -111,6 +111,11 @@ class Integration(Base):
 
     organization: Mapped["Organization"] = relationship(back_populates="integrations")
 
+    @property
+    def is_demo(self) -> bool:
+        """Connexion simulée (DEMO_MODE) : aucun jeton réel, pas de synchronisation possible."""
+        return bool((self.metadata_json or {}).get("demo"))
+
 
 class RawEvent(Base):
     __tablename__ = "raw_events"

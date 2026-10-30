@@ -11,17 +11,22 @@ from app.services.audit import log_audit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+REGISTER_MAX_PER_WINDOW = 5  # inscriptions par IP et par fenêtre LOGIN_WINDOW_SECONDS
+
 
 def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
 @router.post("/register", response_model=AuthToken, status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    login_limiter.check(f"register:{_client_ip(request)}")
+async def register(body: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db, scope="function")):
+    # Chaque inscription compte (réussie ou non) : sans cela, une IP pouvait créer
+    # un nombre illimité d'organisations.
+    register_key = f"register:{_client_ip(request)}"
+    login_limiter.check(register_key, REGISTER_MAX_PER_WINDOW)
+    login_limiter.record_failure(register_key)
     existing = await db.execute(select(User).where(User.email == body.email))
     if existing.scalar_one_or_none():
-        login_limiter.record_failure(f"register:{_client_ip(request)}")
         raise HTTPException(status_code=400, detail="Email already registered")
 
     org = Organization(name=body.organization_name, vertical="comptabilite")
@@ -45,7 +50,7 @@ async def register(body: RegisterRequest, request: Request, db: AsyncSession = D
 
 
 @router.post("/login", response_model=AuthToken)
-async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db, scope="function")):
     keys = (f"login:ip:{_client_ip(request)}", f"login:email:{body.email}")
     for k in keys:
         login_limiter.check(k)

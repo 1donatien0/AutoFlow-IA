@@ -14,7 +14,7 @@ router = APIRouter(prefix="/predictions", tags=["predictions"])
 @router.post("/generate", response_model=list[PredictionOut])
 async def generate(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await generate_predictions(db, user.organization_id)
 
@@ -22,7 +22,7 @@ async def generate(
 @router.get("", response_model=list[PredictionOut])
 async def list_predictions(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(Prediction)
